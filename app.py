@@ -5,15 +5,28 @@ from fuzzywuzzy import fuzz
 import nltk
 from nltk.corpus import stopwords
 from nltk.util import ngrams
+
+try:
+    stopwords.words("english")
+except LookupError:
+    nltk.download("stopwords")
 import re
 
-nltk.download("punkt")
-nltk.download("stopwords")
+# nltk.download("punkt")
+# nltk.download("stopwords")
 
 app = Flask(__name__)
 CORS(app)
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+# model = SentenceTransformer("all-MiniLM-L6-v2")
+model = None
+
+def get_model():
+    global model
+    if model is None:
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+    return model
+
 
 # ---------------- SKILLS CONFIG ----------------
 
@@ -80,13 +93,13 @@ def fuzzy_match(skill, text):
 def semantic_match(skills, resume_text):
     found, missing = [], []
     resume_clean = normalize_text(resume_text)
-    resume_emb = model.encode(resume_clean, convert_to_tensor=True)
+    resume_emb = get_model().encode(resume_clean, convert_to_tensor=True)
 
     for skill in skills:
         if skill in resume_clean or fuzzy_match(skill, resume_clean):
             found.append(skill)
         else:
-            skill_emb = model.encode(skill, convert_to_tensor=True)
+            skill_emb = get_model().encode(skill, convert_to_tensor=True)
             sim = util.pytorch_cos_sim(skill_emb, resume_emb).item()
             if sim >= 0.6:
                 found.append(skill)
@@ -145,8 +158,9 @@ def prettify(skills):
 # ---------------- CORE ANALYSIS ----------------
 
 def analyze_logic(resume_text, jd_text):
-    emb_r = model.encode(normalize_text(resume_text), convert_to_tensor=True)
-    emb_j = model.encode(normalize_text(jd_text), convert_to_tensor=True)
+    emb_r = get_model().encode(normalize_text(resume_text), convert_to_tensor=True)
+    emb_j = get_model().encode(normalize_text(jd_text), convert_to_tensor=True)
+
     text_score = round(util.pytorch_cos_sim(emb_r, emb_j).item() * 100, 2)
 
     jd_skills = extract_phrases(jd_text)
@@ -156,7 +170,10 @@ def analyze_logic(resume_text, jd_text):
     found = prettify(found_hard + found_soft)
     missing = prettify(missing_hard + missing_soft)
 
-    skill_score = round((len(found) / (len(found) + len(missing))) * 100, 2) if (found or missing) else 0
+    skill_score = round(
+        (len(found) / (len(found) + len(missing))) * 100, 2
+    ) if (found or missing) else 0
+
     hybrid = round(text_score * TEXT_WEIGHT + skill_score * SKILL_WEIGHT, 2)
 
     skill_strength = calculate_skill_strength(resume_text, found + missing)
@@ -179,6 +196,7 @@ def analyze_logic(resume_text, jd_text):
             if missing else "Excellent match 🎉"
         )
     }
+
 
 # ---------------- ROUTES ----------------
 
