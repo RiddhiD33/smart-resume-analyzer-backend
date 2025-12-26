@@ -200,14 +200,25 @@ def analyze_logic(resume_text, jd_text):
 
 # ---------------- ROUTES ----------------
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def home():
     return "Flask is running OK"
 
+
 @app.route("/api/analyze", methods=["POST"])
 def analyze_api():
-    data = request.get_json()
-    return jsonify(analyze_logic(data.get("resume",""), data.get("jd","")))
+    data = request.get_json(force=True)
+
+    if not data:
+        return jsonify({"error": "No JSON received"}), 400
+
+    return jsonify(
+        analyze_logic(
+            data.get("resume", ""),
+            data.get("jd", "")
+        )
+    )
+
 
 @app.route("/uploadResume", methods=["POST"])
 def upload_resume():
