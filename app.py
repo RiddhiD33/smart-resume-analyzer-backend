@@ -27,6 +27,10 @@ def get_model():
         model = SentenceTransformer("all-MiniLM-L6-v2")
     return model
 
+# 🔥 PRELOAD MODEL AT STARTUP (prevents Render timeout)
+get_model()
+
+
 
 # ---------------- SKILLS CONFIG ----------------
 
